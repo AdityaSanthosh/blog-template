@@ -6,6 +6,9 @@
 	/* body {
 		transition: background-color 0.5s ease;
 	} */
+	a {
+		font-family: 'Yanone Kaffeesatz', sans-serif;
+	}
 
 	.prose code {
 		@apply text-base;
@@ -19,6 +22,7 @@
 	h5,
 	h6 {
 		@apply text-zinc-800 dark:text-zinc-100   !important;
+		font-family: 'Yanone Kaffeesatz', sans-serif;
 	}
 
 	html.dark .shiki,
