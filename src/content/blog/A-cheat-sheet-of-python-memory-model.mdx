@@ -1,0 +1,41 @@
+---
+heroImage: /src/assets/images/Python Memory Model.png
+category: Programming
+description: Just a cheat sheet. Might make a detailed post later
+pubDate: 2025-05-19T18:30:00.000Z
+tags:
+  - python
+  - cheatsheet
+title: A cheat sheet of python memory model
+---
+
+In Python, Variable names are essentially a reference to an object in memory.
+
+**Immutability**: The Value of the variable cannot be changed, i.e., you cannot modify an immutable object, but you can always re-initialize it. When re-initializing, all existing references still point to the old memory location and contain the same object.
+
+_Immutable_ data types are strings, numbers(integers, floats, complex), frozen sets, bytes, and booleans.
+_Mutable_ data types like lists, Class Instances/objects, dictionaries, sets, byte-arrays
+
+When one reference is redefined to a new value, it points to a new object in memory.
+
+**Operations affecting memory**
+
+1. A new list is created. Plus(+) returns a new object
+   `new_list = old_list + [1]`
+2. The existing list is modified. append is a inplace operation
+   `old_list.append(1)`
+   Basically, the data-type operations that return a value creates a new object and the ones that dont modify the same object.
+
+- List Multiplication (`*`): Creates a new list by repeating the original list's elements.
+- Slicing (`[:]`, `[start:end]`): Creates a new list containing a portion of the original. Elements are references to the original objects.
+- String Methods: `upper()`, `lower()`, `replace()` create new string objects.
+
+You don't need to care about whether an object is allocated on the stack vs the heap. But since the size of Python data types can be extended, objects are usually stored on the heap. Only local variables in functions are stored on the stack.
+
+**Copying in Python:**
+
+- **Immutable Objects:** No need to copy. References suffice.
+- **Mutable Objects:**
+  - **Shallow Copy (`copy.copy()`):** New collection, same element references.
+  - **Deep Copy (`copy.deepcopy()`):** New collection, recursively copies all objects.
+  - Copying is needed to modify without affecting the original.
