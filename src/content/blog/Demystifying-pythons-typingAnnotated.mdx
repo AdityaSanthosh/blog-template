@@ -1,0 +1,57 @@
+---
+heroImage: /src/assets/images/Python Annotations.png
+category: Programming
+description: .
+pubDate: 2025-05-24T18:30:00.000Z
+tags:
+  - FastAPI
+  - python
+title: Demystifying python's typing.Annotated
+---
+
+FastAPI heavily uses this advanced Python typing feature (Python 3.9+).
+
+The Problem Annotated Solves: Standard Python type hints (param: str) are primarily for static analysis and are ignored at runtime. However, sometimes you need to attach more information (metadata) to a type hint that a library can read and act upon at runtime.
+
+How Annotated Works: It allows you to "annotate" a type with arbitrary metadata: Annotated\[Type, metadata1, metadata2, ...]. Python itself ignores the metadata, but frameworks can read it.
+
+Annotated In FastAPI's Context: Annotated provides a clean, standardized, and explicit way to combine a parameter's type with instructions for FastAPI.
+
+Before Annotated (or without it): The Query(...) object acts as both a default value and FastAPI's instruction. This can be ambiguous.\
+\
+
+```python
+from fastapi import Query
+
+# Is Query() a default value or a special instruction?
+# It's a bit ambiguous.
+q: str = Query(min_length=3, description="Search query string")
+```
+
+\
+With Annotated (The clearer way): The parameter's type (str) is separated from the instruction (Query(...)) for FastAPI.\
+
+```python
+from typing import Annotated
+from fastapi import Query
+
+# Clear: 'q' is a string. The Query(...) part is *metadata*
+# telling FastAPI how to handle it (source from query, validate length, add description).
+q: Annotated[str, Query(min_length=3, description="Search query string")]
+```
+
+\
+Another common use case: Pydantic Models (v2+): When defining data models, Annotated with Field provides a clear distinction between validation and serialization metadata.\
+
+```python
+from typing import Annotated
+from pydantic import BaseModel, Field
+
+class User(BaseModel):
+    # 'name' is a string. The Field(...) is metadata for Pydantic validation.
+    name: Annotated[str, Field(min_length=2, max_length=50)]
+    age: Annotated[int, Field(gt=0, le=120)]
+```
+
+\
+Conclusion: Annotated makes your code more readable and explicit by neatly separating the variable's type from its source/validation/behavioral instructions. It's a powerful feature that libraries leverage to provide intuitive APIs.
