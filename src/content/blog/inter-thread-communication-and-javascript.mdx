@@ -11,31 +11,47 @@ tags:
 title: Inter-thread communication and parallelism in javascript
 ---
 
-**Aditya:** Let's say a thread delegated a task to another thread. (I am assuming this is done by placing the task in a shared memory location such as a queue). How does the background thread notify the primary thread once the task is completed/failed ?
+<h4>
+	Let's say a thread delegated a task to another thread. (Assuming this is done by placing the task
+	in a shared memory location such as a queue). How does the background thread notify the primary
+	thread once the task is completed/failed?
+</h4>
 
-**Researcher:** The background thread can notify the primary thread using several common methods:
+The background thread can notify the primary thread using several common methods:
 
-1.  **Shared Memory with Synchronization:** The threads use shared data (e.g., status flags) protected by synchronization mechanisms like **mutexes**, **condition variables**, or **semaphores**. The background thread updates the shared status and signals the primary thread, which was waiting for this signal.
-2.  **Callbacks:** The primary thread passes a function reference to the background thread. The background thread invokes this function upon completion/failure.
-3.  **Futures/Promises/Tasks:** Higher-level abstractions where the primary thread receives a `Future` object immediately. The background thread sets the result/exception on this `Future`, which the primary thread can then `get()` or attach callbacks to.
-4.  **Message Queues:** The background thread places a result/status message on a queue that the primary thread monitors.
-5.  **Event Systems:** Threads publish events (e.g., "TaskCompleted") that other threads subscribe to.
+1.  <u>**Shared Memory with Synchronization:**</u> The threads use shared data (e.g., status flags) protected
+    by synchronization mechanisms like **mutexes**, **condition variables**, or **semaphores**. The background
+    thread updates the shared status and signals the primary thread, which was waiting for this signal.
+2.  <u>**Callbacks:**</u> The primary thread passes a function reference to the background thread. The
+    background thread invokes this function upon completion/failure.
+3.  <u>**Futures/Promises/Tasks:**</u> Higher-level abstractions where the primary thread receives a
+    `Future` object immediately. The background thread sets the result/exception on this `Future`, which
+    the primary thread can then `get()` or attach callbacks to.
+4.  <u>**Message Queues:**</u> The background thread places a result/status message on a queue that the
+    primary thread monitors.
+5.  <u>**Event Systems:**</u> Threads publish events (e.g., "TaskCompleted") that other threads subscribe
+    to.
 
 ---
 
-**Aditya:** Wait, what are the differences between mutexes and condition variables again
+<h4>Wait, what are the differences between mutexes and condition variables again</h4>
 
-**Researcher:**
-
-- **Mutexes** (`threading.Lock` in Python) ensure only one thread accesses the shared data at a time.
-- **Condition Variables** are used with mutexes to allow threads to efficiently wait for a specific condition (e.g., task completion) without constantly polling. The background thread signals the condition variable when the state changes.
-- **Semaphores** are counting mechanisms that can be used for simple signaling (a count of 0 means "wait," releasing increments the count, potentially waking a waiting thread).
+- <u>**Mutexes**</u> (`threading.Lock` in Python) ensure only one thread accesses the shared data at
+  a time.
+- <u>**Condition Variables**</u> are used with mutexes to allow threads to efficiently wait for a specific
+  condition (e.g., task completion) without constantly polling. The background thread signals the condition
+  variable when the state changes.
+- <u>**Semaphores**</u> are counting mechanisms that can be used for simple signaling (a count of 0 means
+  "wait," releasing increments the count, potentially waking a waiting thread).
 
 ---
 
-**Aditya:** On a high level, can I say that if the primary thread doesn't want to blocked waiting for the completion of background thread task, it has to have a event loop to check the status of the task
+<h4>
+	On a high level, can I say that if the primary thread doesn't want to blocked waiting for the
+	completion of background thread task, it has to have a event loop to check the status of the task
+</h4>
 
-**Researcher:** Yes, on a high level, if the primary thread needs to remain unblocked while waiting for a background task, it generally requires a **non-blocking mechanism** for notification. An **event loop** is a powerful pattern to achieve this. Instead of blocking, the primary thread continues its work and either:
+Yes, on a high level, if the primary thread needs to remain unblocked while waiting for a background task, it generally requires a **non-blocking mechanism** for notification. An **event loop** is a powerful pattern to achieve this. Instead of blocking, the primary thread continues its work and either:
 
 - **Periodically polls** for status (less efficient).
 - **Receives callbacks** (often managed by a higher-level event system or thread pool) that are dispatched to its context.
@@ -43,9 +59,12 @@ title: Inter-thread communication and parallelism in javascript
 
 ---
 
-**Aditya:** well how can a callback triggered by background thread run in main thread context if main thread is doing something. It has to put that in a completion queue i guess
+<h4>
+	Well how can a callback triggered by background thread run in main thread context if main thread
+	is doing something. It has to put that in a completion queue I guess
+</h4>
 
-**Researcher:** You are absolutely correct. A callback triggered by a background thread cannot directly execute in the primary (main) thread's context if the main thread is busy. To achieve this, it relies on an **intermediary mechanism, often a message queue or event queue (your "completion queue").**
+You are absolutely correct. A callback triggered by a background thread cannot directly execute in the primary (main) thread's context if the main thread is busy. To achieve this, it relies on an **intermediary mechanism, often a message queue or event queue (your "completion queue").**
 
 - The background thread **places an "event" or "message"** (containing the callback and its arguments) onto a thread-safe queue.
 - The primary thread, as part of its own **event loop**, periodically checks this queue.
@@ -54,44 +73,69 @@ title: Inter-thread communication and parallelism in javascript
 
 ---
 
-**Aditya:** So, technically even a callback is also a completion queue underneath
+<h4>So, technically even a callback is also a completion queue underneath</h4>
 
-**Researcher:** Yes, you are very accurate. In scenarios where a callback needs to run in a _different_ thread's context (like a background thread notifying the main/UI thread), **that callback is indeed queued underneath** by an underlying mechanism. The background thread doesn't directly call it, but rather puts a "request" for the main thread to execute the callback into a queue, which the main thread processes within its event loop.
-
----
-
-**Aditya:** Is this how things work in JS land with async/await, callbacks and promises?
-
-**Researcher:** Yes, this is exactly how it works in JavaScript. JavaScript is **single-threaded**, so it achieves concurrency through an **Event Loop** and **queues**, not through true parallelism with multiple CPU cores.
-
-- **Delegation:** When `setTimeout` or `Workspace` are called, JavaScript **delegates** these long-running tasks to **Host APIs** (browser Web APIs or Node.js C++ APIs), which run in the background.
-- **Queuing:** Once the Host API completes its task, it places the associated **callback function** (or Promise `.then()` handler, or `async/await` continuation) into either the **Microtask Queue** (for Promises/async/await, higher priority) or the **Macrotask Queue** (for `setTimeout`, I/O).
-- **Event Loop:** The single JavaScript **Event Loop** continuously checks if the **Call Stack** (where synchronous JS runs) is empty. If it is, it first drains the entire **Microtask Queue**, and _then_ picks one task from the **Macrotask Queue** to push onto the Call Stack for execution. This ensures non-blocking behavior.
+Yes, you are very accurate. In scenarios where a callback needs to run in a _different_ thread's context (like a background thread notifying the main/UI thread), **that callback is indeed queued underneath** by an underlying mechanism. The background thread doesn't directly call it, but rather puts a "request" for the main thread to execute the callback into a queue, which the main thread processes within its event loop.
 
 ---
 
-**Aditya:** If js in single thread, how can async functions like `setTimeout` and api requests are executed. simple technical explainations please(no analogies)
+<h4>Is this how things work in JS land with async/await, callbacks and promises?</h4>
 
-**Researcher:** JavaScript has a single **Call Stack** for code execution. Asynchronous operations are handled by:
+Yes, this is exactly how it works in JavaScript. JavaScript is **single-threaded**, so it achieves concurrency through an **Event Loop** and **queues**, not through true parallelism with multiple CPU cores.
 
-1.  **Delegation to Host Environments:** When `setTimeout` or `Workspace` are called, the JavaScript engine delegates these tasks to **Host APIs** (browser Web APIs or Node.js C++ APIs). These APIs are implemented in lower-level languages (like C++) and can perform operations concurrently _outside_ the JavaScript engine. The JS function immediately returns.
-2.  **Background Execution:** The Host API performs the task (e.g., timer countdown, network request) in the background.
-3.  **Completion & Enqueueing:** Upon completion, the Host API places the associated **JavaScript callback function** into either the **Microtask Queue** (for Promises, async/await) or the **Macrotask Queue** (for `setTimeout`, I/O).
-4.  **Event Loop:** The **Event Loop** constantly monitors if the **Call Stack is empty**. If it is, it first drains the entire **Microtask Queue**, then picks one task from the **Macrotask Queue**, and moves it to the Call Stack for the JavaScript engine to execute. This ensures sequential execution on the single thread while maintaining non-blocking behavior.
+- <u>**Delegation:**</u> When `setTimeout` or `Workspace` are called, JavaScript **delegates** these
+  long-running tasks to **Host APIs** (browser Web APIs or Node.js C++ APIs), which run in the background.
+- <u>**Queuing:**</u> Once the Host API completes its task, it places the associated **callback function**
+  (or Promise `.then()` handler, or `async/await` continuation) into either the **Microtask Queue** (for
+  Promises/async/await, higher priority) or the **Macrotask Queue** (for `setTimeout`, I/O).
+- <u>**Event Loop:**</u> The single JavaScript **Event Loop** continuously checks if the **Call Stack**
+  (where synchronous JS runs) is empty. If it is, it first drains the entire **Microtask Queue**, and
+  _then_ picks one task from the **Macrotask Queue** to push onto the Call Stack for execution. This
+  ensures non-blocking behavior.
 
 ---
 
-**Aditya:** so host apis have different javascript interpreter. is that what you are saying
+<h4>
+	If js in single thread, how can async functions like `setTimeout` and api requests are executed.
+	simple technical explainations please(no analogies)
+</h4>
 
-**Researcher:** No, that's incorrect. **Host APIs do NOT have different JavaScript interpreters.**
+JavaScript has a single **Call Stack** for code execution. Asynchronous operations are handled by:
 
-- The **JavaScript Engine** (e.g., V8) is the _only_ component that interprets and executes your JavaScript code. It has a single Call Stack.
-- **Host APIs** (Web APIs in browsers, C++ APIs in Node.js) are functionalities written in _other languages_ (like C++) that operate _outside_ the JavaScript engine.
+1.  <u>**Delegation to Host Environments:**</u> When `setTimeout` or `Workspace` are called, the JavaScript
+    engine delegates these tasks to **Host APIs** (browser Web APIs or Node.js C++ APIs). These APIs
+    are implemented in lower-level languages (like C++) and can perform operations concurrently _outside_
+    the JavaScript engine. The JS function immediately returns.
+2.  <u>**Background Execution:**</u> The Host API performs the task (e.g., timer countdown, network request)
+    in the background.
+3.  <u>**Completion & Enqueueing:**</u> Upon completion, the Host API places the associated **JavaScript
+    callback function** into either the **Microtask Queue** (for Promises, async/await) or the **Macrotask
+    Queue** (for `setTimeout`, I/O).
+4.  <u>**Event Loop:**</u> The **Event Loop** constantly monitors if the **Call Stack is empty**. If
+    it is, it first drains the entire **Microtask Queue**, then picks one task from the **Macrotask Queue**,
+    and moves it to the Call Stack for the JavaScript engine to execute. This ensures sequential execution
+    on the single thread while maintaining non-blocking behavior.
+
+---
+
+<h4>So host apis have different javascript interpreter. is that what you are saying</h4>
+
+No, that's incorrect. <u>**Host APIs do NOT have different JavaScript interpreters.**</u>
+
+- The <u>**JavaScript Engine**</u> (e.g., V8) is the _only_ component that interprets and executes your JavaScript code. It has a single Call Stack.
+- <u>**Host APIs**</u> (Web APIs in browsers, C++ APIs in Node.js) are functionalities written in _other
+  languages_ (like C++) that operate _outside_ the JavaScript engine.
 - When JavaScript calls an async Host API, it's a **delegation** of a task to that external C++ code. The C++ code performs its operation. Once done, it doesn't execute JavaScript; instead, it **queues** the relevant JavaScript callback function to be executed by the _same single JavaScript engine_ when the Event Loop determines the Call Stack is free.
-  **Web APIs (like `setTimeout`, `Workspace`, DOM manipulation) in browsers, and core modules in Node.js (like `fs`, `http`), are predominantly implemented in low-level languages such as C or C++.** This is done for:
-- **Performance:** To execute these I/O-bound or computationally intensive tasks as fast as possible.
-- **Access to System Resources:** To directly interact with the operating system for things like network sockets, file I/O, or hardware.
-- **Security and Stability:** To abstract complex system-level operations behind a safe JavaScript API.
+  <u>
+  	**Web APIs (like `setTimeout`, `Workspace`, DOM manipulation) in browsers, and core modules in
+  	Node.js (like `fs`, `http`), are predominantly implemented in low-level languages such as C or
+  	C++.**
+  </u> This is done for:
+- <u>**Performance:**</u> To execute these I/O-bound or computationally intensive tasks as fast as possible.
+- <u>**Access to System Resources:**</u> To directly interact with the operating system for things like
+  network sockets, file I/O, or hardware.
+- <u>**Security and Stability:**</u> To abstract complex system-level operations behind a safe JavaScript
+  API.
 
 _When JavaScript calls `Workspace()`, the JS engine delegates the actual network request to this underlying C++ implementation. This C++ code runs in the background. Once it receives a response, it doesn't execute JavaScript. Instead, it places the associated JavaScript callback (e.g., the `.then()` handler) into the JavaScript runtime's queues. The JavaScript Event Loop then picks up that callback when the single JavaScript thread is free to execute it._
 
